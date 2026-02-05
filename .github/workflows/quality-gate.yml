@@ -1,0 +1,44 @@
+name: Quality Gate (Lint & Style)
+
+# GATILHOS: Roda em todo Push e todo Pull Request para a main
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  code-quality:
+    runs-on: ubuntu-latest
+    
+    steps:
+    # 1. Baixa o código do repositório
+    - name: Checkout do Código
+      uses: actions/checkout@v4
+
+    # 2. Prepara o Python
+    - name: Configurar Python 3.9
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.9"
+
+    # 3. Instala Ferramentas de Qualidade
+    - name: Instalar Linters
+      run: |
+        python -m pip install --upgrade pip
+        pip install flake8 black
+
+    # 4. Verifica Formatação
+    - name: Verificar Formatação (Black)
+      run: |
+        black . --check --verbose || echo "⚠️ Aviso: Alguns arquivos não seguem o padrão Black."
+
+    # 5. Análise Estática
+    # Verifica erros de sintaxe e variáveis não usadas.
+    # E501 ignora linhas muito longas
+    - name: Rodar Linter (Flake8)
+      run: |
+        # count: conta erros | select=E9,F63,F7,F82: foca apenas em erros graves de sintaxe
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        # Agora roda verificações de estilo, tratando como aviso (exit-zero)
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
