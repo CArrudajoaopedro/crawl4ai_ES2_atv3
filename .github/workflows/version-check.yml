@@ -1,0 +1,76 @@
+name: Version Integrity Check
+
+on:
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  check-version-logic:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code (Current Branch)
+        uses: actions/checkout@v4
+        with:
+          path: current
+
+      - name: Checkout Code (Main/Base)
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: base
+
+      - name: Verify Version Logic
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.9"
+
+      - name: Run Validation Script
+        run: |
+          python3 -c "
+          import sys
+          import re
+
+          def load_version(path):
+              try:
+                  with open(path, 'r') as f:
+                      content = f.read()
+                  g = {}
+                  exec(content, g)
+                  return g.get('__version__')
+              except Exception as e:
+                  print(f'::error::Syntax Error in {path}: {e}')
+                  sys.exit(1)
+
+          def parse_version(v_str):
+              # Check strictly for Number.Number.Number format (Semantic Versioning)
+              if not re.match(r'^\d+\.\d+\.\d+$', v_str):
+                  return None
+              return [int(x) for x in v_str.split('.')]
+
+          # 1. Load Versions
+          v_base_str = load_version('base/crawl4ai/__version__.py')
+          v_pr_str = load_version('current/crawl4ai/__version__.py')
+
+          print(f'Main Version: {v_base_str}')
+          print(f'PR Version:   {v_pr_str}')
+
+          # 2. Check Format (Did they write it correctly?)
+          v_base = parse_version(v_base_str)
+          v_pr = parse_version(v_pr_str)
+
+          if not v_pr:
+              print(f'::error::Invalid format! Version {v_pr_str} does not look like X.Y.Z (e.g., 1.2.3)')
+              sys.exit(1)
+
+          # 3. Check Logic (Is it an old version?)
+          if v_pr == v_base:
+              print('::warning::Version has not changed. If this PR releases new code, please bump the version.')
+              # Not an error exit, just a warning
+              sys.exit(0)
+          
+          if v_pr < v_base:
+              print(f'::error::Version Regression! You are trying to downgrade from {v_base_str} to {v_pr_str}.')
+              sys.exit(1)
+
+          print(f'::notice::Success! Version bumped from {v_base_str} to {v_pr_str}.')
+          "
