@@ -47,4 +47,4 @@ jobs:
         with:
           path: ./
           extra_args: --debug --only-verified
-        continue-on-error: true
+        continue-on-error: false
